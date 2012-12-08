@@ -8,14 +8,15 @@ var express = require('express')
   , herenow = require('./herenow/herenow');
   
 // Set up express server
-var app = module.exports = express.createServer();
+var app = express();
 app.configure(function(){
-  app.set('views', __dirname + '/views');
+  app.use(express.static(__dirname + '/public'))
   app.set('view engine', 'jade');
+
   app.use(express.bodyParser());
   app.use(express.methodOverride());
+  app.use(express.logger());
   app.use(app.router);
-  app.use(express.static(__dirname + '/public'));
 });
 
 app.configure('development', function(){
@@ -38,7 +39,7 @@ app.post('/devices/:mac', function(req, res){
 // Start web listener
 
 app.listen(3000, function(){
-  console.log("Express server listening on port %d in %s mode", app.address().port, app.settings.env);
+  console.log("Express server listening on port %d in %s mode", 3000, app.settings.env);
 });
 
 // Start network monitor
@@ -60,26 +61,30 @@ var port_scanner = new PortScanner();
 var DeviceIdentifier = require('./lib/device_identifier.js');
 var device_identifier = new DeviceIdentifier();
 
+var UserRegister = require('./lib/user_register.js');
+var user_register = new UserRegister();
+user_register.start();
+
 monitor.on('connected', function (mac) {
-// console.log(this.prototype.toString())
-  // console.log(this.instanceOf + "New device detected: " + mac);
+  console.log("Monitor: New device detected: " + mac);
   device_identifier.attempt_identification(mac);
   port_scanner.scan(mac);
+  user_register.checkin(mac);
 });
 
 monitor.on('reconnected', function (mac) {
   console.log("Monitor: Known device detected: " + mac);
   device_identifier.attempt_identification(mac);
   port_scanner.scan(mac);
+  user_register.checkin(mac);
 });
 
 monitor.on('disconnected', function (mac) {
   console.log("Monitor: Device disconnected: " + mac);
+  user_register.checkout(mac);
 });
 
 port_scanner.on('complete', function (mac) {
-  
-  console.log("PortScanner: Port scan complete: " + mac);
   device_identifier.attempt_identification(mac);
 });
 
